@@ -1,7 +1,9 @@
+import React from 'react';
 import ReactDOMServer from 'react-dom/server';
 import { StaticRouter } from 'react-router-dom/server';
 import { HelmetProvider } from 'react-helmet-async';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import ssrPrepass from 'react-ssr-prepass';
 import App from './App';
 
 export async function render(url: string) {
@@ -56,7 +58,7 @@ export async function render(url: string) {
 
   const helmetContext = {};
 
-  const html = ReactDOMServer.renderToString(
+  const appTree = (
     <QueryClientProvider client={queryClient}>
       <HelmetProvider context={helmetContext}>
         <StaticRouter location={url}>
@@ -65,6 +67,38 @@ export async function render(url: string) {
       </HelmetProvider>
     </QueryClientProvider>
   );
+
+  const reactInternals = (React as any).__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED;
+  const dispatcherRef = {
+    target: null as any,
+    original: undefined as any,
+  };
+
+  const ensureInsertionEffect = () => {
+    const currentDispatcher = reactInternals?.ReactCurrentDispatcher?.current;
+    if (!currentDispatcher) return;
+
+    if (!dispatcherRef.target) {
+      dispatcherRef.target = currentDispatcher;
+      dispatcherRef.original = currentDispatcher.useInsertionEffect;
+    }
+
+    if (!currentDispatcher.useInsertionEffect) {
+      currentDispatcher.useInsertionEffect = currentDispatcher.useEffect ?? (() => {});
+    }
+  };
+
+  ensureInsertionEffect();
+
+  try {
+    await ssrPrepass(appTree, ensureInsertionEffect);
+  } finally {
+    if (dispatcherRef.target) {
+      dispatcherRef.target.useInsertionEffect = dispatcherRef.original;
+    }
+  }
+
+  const html = ReactDOMServer.renderToString(appTree);
   
   return html;
 }
