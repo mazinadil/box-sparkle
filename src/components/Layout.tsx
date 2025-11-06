@@ -1,9 +1,8 @@
-import { ReactNode, lazy, Suspense } from "react";
+import { ReactNode } from "react";
 import { useIntersectionObserver } from "@/hooks/useIntersectionObserver";
 import Header from "./Header";
 import WhatsAppButton from "./WhatsAppButton";
-
-const Footer = lazy(() => import("./Footer"));
+import Footer from "./Footer";
 
 interface LayoutProps {
   children: ReactNode;
@@ -18,13 +17,7 @@ const Layout = ({ children }: LayoutProps) => {
       <main className="flex-grow">
         {children}
       </main>
-      <div ref={ref}>
-        {isVisible && (
-          <Suspense fallback={<div className="h-96" />}>
-            <Footer />
-          </Suspense>
-        )}
-      </div>
+      <div ref={ref}>{isVisible && <Footer />}</div>
       <WhatsAppButton />
     </div>
   );
